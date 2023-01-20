@@ -1,0 +1,31 @@
+pipeline {
+    agent any
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: '<YOUR_GIT_BRANCH>', credentialsId: '<YOUR_CREDENTIALS_ID>', url: '<YOUR_GIT_URL>'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'docker build -t <YOUR_IMAGE_NAME> -f <YOUR_DOCKERFILE_NAME> .'
+            }
+        }
+        stage('Push to ECR') {
+            steps {
+                withCredentials([aws(credentialsId: '<YOUR_CREDENTIALS_ID>', region: '<YOUR_REGION>')]) {
+                    sh 'aws ecr get-login-password | docker login --username AWS --password-stdin <YOUR_REGISTRY_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com'
+                    sh 'docker tag <YOUR_IMAGE_NAME>:latest <YOUR_REGISTRY_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/<YOUR_ECR_REPOSITORY_NAME>:latest'
+                    sh 'docker push <YOUR_REGISTRY_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/<YOUR_ECR_REPOSITORY_NAME>:latest'
+                }
+            }
+        }
+        stage('Deploy to ECS') {
+            steps {
+                withCredentials([aws(credentialsId: '<YOUR_CREDENTIALS_ID>', region: '<YOUR_REGION>')]) {
+                    sh 'aws ecs update-service --cluster <YOUR_ECS_CLUSTER> --service <YOUR_ECS_SERVICE> --task-definition <YOUR_ECS_TASK_DEFINITION> --force-new-deployment --launch-type <YOUR_LAUNCH_TYPE> --container-name <YOUR_CONTAINER_NAME> --container-port <YOUR_CONTAINER_PORT> --image <YOUR_REGISTRY_ID>.dkr.ecr.<YOUR_REGION>.amazonaws.com/<YOUR_ECR_REPOSITORY_NAME>:<YOUR_IMAGE_TAG>'
+                }
+            }
+        }
+    }
+}
